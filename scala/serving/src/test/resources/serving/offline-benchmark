@@ -1,0 +1,17 @@
+#!/bin/bash
+
+chmod a+x ./*
+
+export BIGDL_HOME=$(pwd)/../../../../..
+export BPATH=$BIGDL_HOME/scala/serving/scripts
+export PYTHONPATH=$PYTHONPATH:$BIGDL_HOME/python/serving/src
+
+$BPATH/cluster-serving-start &
+sleep 20
+
+python3 ./cluster-serving-enqueue-test.py
+
+sleep 180
+$BPATH/cluster-serving-stop
+
+echo "Benchmark test end, please check at flink Dashboard"

@@ -1,0 +1,119 @@
+/*
+ * Copyright 2016 The BigDL Authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.intel.analytics.bigdl.dllib.nn.abstractnn
+
+import com.intel.analytics.bigdl.dllib.nn.internal.{Input => KInput, Sequential => KSequential}
+import com.intel.analytics.bigdl.dllib.nn.{Input => TInput}
+import com.intel.analytics.bigdl.dllib.utils.{Log4Error, Shape}
+
+import scala.language.existentials
+import scala.reflect.ClassTag
+
+class InvalidLayer(msg: String) extends RuntimeException(msg)
+
+trait InferShape {
+  private[bigdl] var _inputShapeValue: Shape = null
+
+  private[bigdl] var _outputShapeValue: Shape = null
+
+  private[bigdl] def inputShapeValue: Shape = _inputShapeValue
+
+  private[bigdl] def outputShapeValue: Shape = _outputShapeValue
+
+  // scalastyle:off
+  private[bigdl] def inputShapeValue_=(value: Shape): Unit = {
+    _inputShapeValue = value
+  }
+
+  private[bigdl] def outputShapeValue_=(value: Shape): Unit = {
+    _outputShapeValue = value
+  }
+  // scalastyle:on
+
+  /**
+   * Return the inputShape for the current Layer and the first dim is batch.
+   */
+  final def getInputShape(): Shape = {
+    Log4Error.invalidInputError(this.isKerasStyle(),
+      "Torch style definition doesn't support getInputShape for now.")
+    _inputShapeValue
+  }
+
+  /**
+   * Return the outputShape for the current Layer and the first dim is batch.
+   */
+  final def getOutputShape(): Shape = {
+//    Log4Error.invalidInputError(this.isKerasStyle(),
+//      "Torch style definition doesn't support getOutputShape for now.")
+//    Log4Error.invalidInputError(this.isBuilt(), "This module hasn't been built.")
+    Log4Error.invalidOperationError(this.isKerasStyle(),
+      "Torch style definition doesn't support getOutputShape for now.",
+    "Please use keras style api")
+    Log4Error.invalidOperationError(this.isBuilt(), "This Layer hasn't been built",
+      "Please add this layer into a Sequential before use")
+    outputShapeValue
+  }
+
+  /**
+   * Execute building logic and return the outputShape for the given inputShape.
+   * NB: the first dim of inputShape is batch
+   */
+  private[bigdl] def build(inputShape: Shape): Shape = {
+    val outputShape = computeOutputShape(inputShape)
+    this.outputShapeValue = outputShape
+    this.inputShapeValue = inputShape
+    outputShape
+  }
+
+  private[bigdl] def isBuilt(): Boolean = outputShapeValue != null
+
+  private[bigdl] def isKerasStyle(): Boolean = false
+
+  private[bigdl] def allowRebuilt(): Boolean = false
+
+  /**
+   * We suppose the first dim is batch
+   */
+  private[bigdl] def computeOutputShape(inputShape: Shape): Shape = {
+    Log4Error.invalidOperationError(false,
+      "Haven't been implemented yet. Do not use it with Keras Layer")
+    null
+  }
+
+  private[bigdl] def excludeInvalidLayers[T: ClassTag]
+  (modules : Seq[AbstractModule[_, _, T]]): Unit = {
+    val invalidNodes = if (this.isKerasStyle()) {
+      modules.filter{!_.isKerasStyle()}
+    } else {
+      modules.filter{_.isKerasStyle()}
+    }
+    if (invalidNodes.length > 0) {
+      Log4Error.invalidOperationError(false,
+        s"""Do not mix ${this}(isKerasStyle=${isKerasStyle()}) with Layer
+                           (isKerasStyle=${invalidNodes(0).isKerasStyle()}):
+         ${invalidNodes.mkString(",")}""")
+    }
+  }
+
+  private[bigdl] def validateInput[T: ClassTag](modules : Seq[AbstractModule[_, _, T]]): Unit = {
+    if (this.isKerasStyle()) {
+      Log4Error.invalidInputError(modules != null && !modules.isEmpty, "Empty input is not allowed")
+    }
+    excludeInvalidLayers(modules)
+  }
+}
+
